@@ -2,7 +2,7 @@
 
 import ChatInput from "@/components/chat/input";
 import ChatMessages from "@/components/chat/messages";
-import useApp from "@/hooks/use-app";
+import { useApp } from "@/hooks/use-app";
 import ChatHeader from "@/components/chat/header";
 
 export default function Chat() {
