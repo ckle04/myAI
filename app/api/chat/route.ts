@@ -1,11 +1,10 @@
-
-
 import { OpenAI } from "openai";
 import { Pinecone } from "@pinecone-database/pinecone";
 import { AIProviders, Chat, Intention } from "@/types";
 import { IntentionModule } from "@/modules/intention";
 import { ResponseModule } from "@/modules/response";
 import { PINECONE_INDEX_NAME } from "@/configuration/pinecone";
+import { getMarketData, analyzeMarketData } from "@/modules/trading";
 import Anthropic from "@anthropic-ai/sdk";
 
 export const maxDuration = 60;
@@ -56,7 +55,25 @@ async function determineIntention(chat: Chat): Promise<Intention> {
 
 export async function POST(req: Request) {
   const { chat } = await req.json();
+  const message = chat.messages[chat.messages.length - 1]?.content || "";
 
+  // 📌 Step 1: Detect if the user is asking about a stock market update
+  if (message.toLowerCase().includes("market") || message.toLowerCase().includes("stock")) {
+    // Extract stock symbol from message (e.g., "market TSLA" → TSLA)
+    const words = message.split(" ");
+    const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY"; // Default to S&P 500 (SPY)
+
+    // 📌 Step 2: Fetch market data
+    const data = await getMarketData(symbol);
+    const analysis = analyzeMarketData(data);
+
+    // 📌 Step 3: Return stock data response
+    return new Response(JSON.stringify({
+      reply: `📈 **Stock Update for ${symbol}**\n🕒 Time: ${analysis.latestTime}\n💰 Open: ${analysis.open}\n📊 High: ${analysis.high}\n📉 Low: ${analysis.low}\n🔒 Close: ${analysis.close}\n📦 Volume: ${analysis.volume}\n📢 **Recommendation:** ${analysis.recommendation}`
+    }), { status: 200 });
+  }
+
+  // 📌 Step 4: If it's NOT a stock-related query, continue as usual
   const intention: Intention = await determineIntention(chat);
 
   if (intention.type === "question") {
@@ -67,4 +84,5 @@ export async function POST(req: Request) {
     return ResponseModule.respondToRandomMessage(chat, providers);
   }
 }
+
 
