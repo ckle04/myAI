@@ -5,28 +5,23 @@ import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { Message } from "../types/chat";
 
 /**
- * Example usage:
- *   const { messages, isStreaming, handleUserMessage } = useApp();
- *   ...
- *   handleUserMessage("market TSLA");
- *
- * It checks if the user typed "market" and calls /api/market-data.
- * Otherwise, it calls /api/chat with streaming (via fetchEventSource).
+ * Hook that manages chat messages, streaming responses, and market data requests.
  */
 export function useApp() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState(""); // Track input value
   const [isStreaming, setIsStreaming] = useState(false);
 
-  // We use a ref to store the current abort controller, so we can cancel streaming if needed
+  // Ref to store the current abort controller for streaming
   const abortControllerRef = useRef<AbortController | null>(null);
 
   /**
-   * handleUserMessage: the main entry point to process new user chat messages
+   * Handles user message input
    */
   async function handleUserMessage(userInput: string) {
     if (!userInput.trim()) return;
 
-    // 1. Add the user’s message to the chat state
+    // 1. Add user's message to the chat state
     const newUserMessage: Message = {
       role: "user",
       content: userInput,
@@ -36,16 +31,16 @@ export function useApp() {
     // 2. Check if it starts with "market" (simple check)
     if (userInput.toLowerCase().startsWith("market")) {
       const parts = userInput.split(" ");
-      const symbol = parts[1] || "SPY"; // default if none
+      const symbol = parts[1] || "SPY"; // Default to SPY if no symbol is given
 
-      // 2a. Fetch from /api/market-data?symbol=...
+      // Fetch market data
       const marketUrl = `/api/market-data?symbol=${symbol}`;
 
       try {
         const res = await fetch(marketUrl);
         const data = await res.json();
 
-        // If successful, data might have { role, content } or { error }
+        // If successful, data should contain { role: 'assistant', content: '...' }
         if (data.role && data.content) {
           setMessages((prev) => [...prev, data]);
         } else if (data.error) {
@@ -61,16 +56,15 @@ export function useApp() {
         ]);
       }
 
-      // 2b. End here, so we don’t proceed to streaming from /api/chat
-      return;
+      return; // Don't proceed with AI response streaming
     }
 
-    // 3. If not a "market" command, proceed with your normal streaming AI call
+    // 3. If not a "market" command, proceed with streaming AI response
     await streamAiResponse(userInput);
   }
 
   /**
-   * Streams the AI response from /api/chat using fetch-event-source
+   * Streams AI response from /api/chat using fetch-event-source
    */
   async function streamAiResponse(userInput: string) {
     setIsStreaming(true);
@@ -82,7 +76,6 @@ export function useApp() {
     abortControllerRef.current = new AbortController();
 
     try {
-      // fetchEventSource is from @microsoft/fetch-event-source
       await fetchEventSource("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,18 +83,16 @@ export function useApp() {
         signal: abortControllerRef.current.signal,
         onmessage: (event) => {
           if (event.data === "[DONE]") {
-            // End of stream
             setIsStreaming(false);
             abortControllerRef.current = null;
             return;
           }
 
-          // Otherwise, append the streamed token to the assistant message
+          // Append the streamed token to the assistant message
           const token = event.data;
           setMessages((prevMessages) => {
             const lastMessage = prevMessages[prevMessages.length - 1];
 
-            // If last message is assistant, append the token
             if (lastMessage && lastMessage.role === "assistant") {
               const updatedMessage = {
                 ...lastMessage,
@@ -109,22 +100,19 @@ export function useApp() {
               };
               return [...prevMessages.slice(0, -1), updatedMessage];
             } else {
-              // Otherwise, create a new assistant message
-              const newAssistantMessage: Message = {
-                role: "assistant",
-                content: token,
-              };
-              return [...prevMessages, newAssistantMessage];
+              return [
+                ...prevMessages,
+                { role: "assistant", content: token },
+              ];
             }
           });
         },
         onerror: (err) => {
-          console.error("EventSource onerror:", err);
+          console.error("EventSource error:", err);
           setIsStreaming(false);
           abortControllerRef.current = null;
         },
         onclose: () => {
-          // The server closed the stream
           setIsStreaming(false);
           abortControllerRef.current = null;
         },
@@ -137,8 +125,32 @@ export function useApp() {
   }
 
   /**
-   * Cleanup on unmount: if the component using this hook unmounts,
-   * we abort the ongoing stream (if any).
+   * Clears all chat messages
+   */
+  function clearMessages() {
+    setMessages([]);
+  }
+
+  /**
+   * Handles input changes for the chat input field
+   */
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setInput(e.target.value);
+  }
+
+  /**
+   * Handles chat message submission
+   */
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim()) return;
+
+    await handleUserMessage(input);
+    setInput(""); // Clear input field
+  }
+
+  /**
+   * Cleanup: Abort any ongoing streaming when component unmounts
    */
   useEffect(() => {
     return () => {
@@ -152,6 +164,9 @@ export function useApp() {
     messages,
     isStreaming,
     handleUserMessage,
+    handleInputChange,
+    handleSubmit,
+    input,
+    clearMessages, // ✅ Ensures clearMessages exists
   };
 }
-
