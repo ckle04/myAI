@@ -7,14 +7,11 @@ import ChatHeader from "@/components/chat/header";
 
 export default function Chat() {
   const {
-    messages,
-    handleInputChange,
-    handleSubmit,
-    input,
-    isLoading,
-    indicatorState,
-    clearMessages,
-  } = useApp();
+  messages,
+  handleUserMessage, // This exists in use-app.ts
+  isStreaming, // This exists in use-app.ts
+} = useApp();
+
 
   return (
     <>
