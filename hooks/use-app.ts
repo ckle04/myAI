@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { Message } from "../types/chat"; // Adjust if your Message type is in a different path
+import { Message } from "../types/chat";
 
 /**
  * Example usage:
@@ -13,7 +13,7 @@ import { Message } from "../types/chat"; // Adjust if your Message type is in a 
  * It checks if the user typed "market" and calls /api/market-data.
  * Otherwise, it calls /api/chat with streaming (via fetchEventSource).
  */
-export default function useApp() {
+export function useApp() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
 
