@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   headers: { "Content-Type": "application/json" }, // ✅ Ensure response is JSON
   status: 200
 });
-
+}
 
         console.log("🤖 Processing non-stock related message");
 
