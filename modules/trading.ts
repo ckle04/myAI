@@ -46,3 +46,4 @@ export function analyzeMarketData(data: any) {
         volume,
         recommendation
     };
+}
