@@ -81,9 +81,12 @@ export async function POST(req: Request) {
             console.log("📈 Stock analysis:", analysis);
 
             return new Response(JSON.stringify({
-                reply: `📈 **Stock Update for ${symbol}**\n🕒 Time: ${analysis.latestTime}\n💰 Open: ${analysis.open}\n📊 High: ${analysis.high}\n📉 Low: ${analysis.low}\n🔒 Close: ${analysis.close}\n📦 Volume: ${analysis.volume}\n📢 **Recommendation:** ${analysis.recommendation}`
-            }), { status: 200 });
-        }
+  reply: `📈 **Stock Update for ${symbol}**\n🕒 **Time:** ${analysis.latestTime}\n💰 **Open:** ${analysis.open}\n📊 **High:** ${analysis.high}\n📉 **Low:** ${analysis.low}\n🔒 **Close:** ${analysis.close}\n📦 **Volume:** ${analysis.volume}\n📢 **Recommendation:** ${analysis.recommendation}`
+}), {
+  headers: { "Content-Type": "application/json" }, // ✅ Ensure response is JSON
+  status: 200
+});
+
 
         console.log("🤖 Processing non-stock related message");
 
