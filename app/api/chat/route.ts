@@ -54,42 +54,51 @@ async function determineIntention(chat: Chat): Promise<Intention> {
 }
 
 export async function POST(req: Request) {
-  const { chat } = await req.json();
-  const message = chat.messages[chat.messages.length - 1]?.content || "";
+    console.log("🔍 Received chat request");
 
-  // 📌 Step 1: Detect if the user is asking about a stock market update
-  if (message.toLowerCase().includes("market") || message.toLowerCase().includes("stock")) {
-    // Extract stock symbol from message (e.g., "market TSLA" → TSLA)
-    const words = message.split(" ");
-    const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY"; // Default to S&P 500 (SPY)
+    try {
+        const { chat } = await req.json();
+        const message = chat.messages[chat.messages.length - 1]?.content || "";
 
-    // 📌 Step 2: Fetch market data
-   const data = await getMarketData(symbol);
+        console.log("📝 User message:", message);
 
-if (data.error) {
-    return new Response(JSON.stringify({
-        reply: "⚠️ Sorry, I couldn't retrieve stock data at this time. Please try again later."
-    }), { status: 200 });
+        // Detect stock market queries
+        if (message.toLowerCase().includes("market") || message.toLowerCase().includes("stock")) {
+            const words = message.split(" ");
+            const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY";
+
+            console.log("📊 Fetching stock data for:", symbol);
+
+            const data = await getMarketData(symbol);
+            if (data.error) {
+                console.log("⚠️ Stock data fetch failed:", data.error);
+                return new Response(JSON.stringify({
+                    reply: "⚠️ Sorry, I couldn't retrieve stock data at this time. Please try again later."
+                }), { status: 200 });
+            }
+
+            const analysis = analyzeMarketData(data);
+            console.log("📈 Stock analysis:", analysis);
+
+            return new Response(JSON.stringify({
+                reply: `📈 **Stock Update for ${symbol}**\n🕒 Time: ${analysis.latestTime}\n💰 Open: ${analysis.open}\n📊 High: ${analysis.high}\n📉 Low: ${analysis.low}\n🔒 Close: ${analysis.close}\n📦 Volume: ${analysis.volume}\n📢 **Recommendation:** ${analysis.recommendation}`
+            }), { status: 200 });
+        }
+
+        console.log("🤖 Processing non-stock related message");
+
+        const intention: Intention = await determineIntention(chat);
+
+        if (intention.type === "question") {
+            return ResponseModule.respondToQuestion(chat, providers, pineconeIndex);
+        } else if (intention.type === "hostile_message") {
+            return ResponseModule.respondToHostileMessage(chat, providers);
+        } else {
+            return ResponseModule.respondToRandomMessage(chat, providers);
+        }
+
+    } catch (error) {
+        console.error("❌ Chatbot API Error:", error);
+        return new Response(JSON.stringify({ reply: "⚠️ Internal Server Error. Please try again later." }), { status: 500 });
+    }
 }
-
-const analysis = analyzeMarketData(data);
-
-    // 📌 Step 3: Return stock data response
-    return new Response(JSON.stringify({
-      reply: `📈 **Stock Update for ${symbol}**\n🕒 Time: ${analysis.latestTime}\n💰 Open: ${analysis.open}\n📊 High: ${analysis.high}\n📉 Low: ${analysis.low}\n🔒 Close: ${analysis.close}\n📦 Volume: ${analysis.volume}\n📢 **Recommendation:** ${analysis.recommendation}`
-    }), { status: 200 });
-  }
-
-  // 📌 Step 4: If it's NOT a stock-related query, continue as usual
-  const intention: Intention = await determineIntention(chat);
-
-  if (intention.type === "question") {
-    return ResponseModule.respondToQuestion(chat, providers, pineconeIndex);
-  } else if (intention.type === "hostile_message") {
-    return ResponseModule.respondToHostileMessage(chat, providers);
-  } else {
-    return ResponseModule.respondToRandomMessage(chat, providers);
-  }
-}
-
-
