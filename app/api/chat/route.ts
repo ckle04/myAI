@@ -1,7 +1,3 @@
-cd myAI-main/app/api
-mkdir market-data
-cd market-data
-touch route.ts
 
 
 import { OpenAI } from "openai";
@@ -11,7 +7,6 @@ import { IntentionModule } from "@/modules/intention";
 import { ResponseModule } from "@/modules/response";
 import { PINECONE_INDEX_NAME } from "@/configuration/pinecone";
 import Anthropic from "@anthropic-ai/sdk";
-import { NextResponse } from 'next/server';
 
 export const maxDuration = 60;
 
@@ -20,8 +15,6 @@ const pineconeApiKey = process.env.PINECONE_API_KEY;
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const fireworksApiKey = process.env.FIREWORKS_API_KEY;
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
-const BASE_URL = 'https://www.alphavantage.co/query';
 
 // Check if API keys are set
 if (!pineconeApiKey) {
@@ -75,27 +68,3 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const symbol = searchParams.get('symbol') || 'SPY';  // Default: S&P 500
-    const interval = searchParams.get('interval') || '5min';  // Default: 5-minute data
-    const adjusted = searchParams.get('adjusted') || 'true';
-    const extended_hours = searchParams.get('extended_hours') || 'true';
-    const outputsize = searchParams.get('outputsize') || 'compact';
-    const datatype = searchParams.get('datatype') || 'json';
-
-    try {
-        const url = `${BASE_URL}?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=${interval}&adjusted=${adjusted}&extended_hours=${extended_hours}&outputsize=${outputsize}&datatype=${datatype}&apikey=${ALPHA_VANTAGE_API_KEY}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!data || data["Error Message"]) {
-            return NextResponse.json({ error: "Failed to fetch market data" }, { status: 500 });
-        }
-
-        return NextResponse.json(data);
-    } catch (error) {
-        return NextResponse.json({ error: "Server Error" }, { status: 500 });
-    }
-}
