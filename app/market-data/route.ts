@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const ALPHA_VANTAGE_API_KEY = process.env.ALPHA_VANTAGE_API_KEY;
+const ALPHA_VANTAGE_API_KEY = process.env.KHVRSO6QKJ82XSA2;
 const BASE_URL = 'https://www.alphavantage.co/query';
 
 export async function GET(req: Request) {
