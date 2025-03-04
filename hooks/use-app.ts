@@ -1,232 +1,131 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { INITIAL_MESSAGE } from "@/configuration/chat";
-import { WORD_CUTOFF, WORD_BREAK_MESSAGE } from "@/configuration/chat";
-import {
-  LoadingIndicator,
-  DisplayMessage,
-  StreamedDone,
-  streamedDoneSchema,
-  StreamedLoading,
-  streamedLoadingSchema,
-  StreamedMessage,
-  streamedMessageSchema,
-  Citation,
-  StreamedError,
-  streamedErrorSchema,
-} from "@/types";
+import { useEffect, useRef, useState } from 'react';
+import { fetchEventSource } from '@microsoft/fetch-event-source'; // Make sure you have this installed!
+import { Message } from '../types/chat'; // Adjust the import based on how your "Message" type is defined
 
-export default function useApp() {
-  const initialAssistantMessage: DisplayMessage = {
-    role: "assistant",
-    content: INITIAL_MESSAGE,
-    citations: [],
-  };
+/**
+ * This is a simplified version that:
+ *   - Tracks chat messages in state.
+ *   - Sends user commands to either /api/market-data (for "market" commands) or /api/chat (for normal ones).
+ *   - Appends server responses to the messages array.
+ *
+ * Adjust it to match your project’s actual types, endpoints, and error handling.
+ */
 
-  const [messages, setMessages] = useState<DisplayMessage[]>([
-    initialAssistantMessage,
-  ]);
-  const [wordCount, setWordCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [indicatorState, setIndicatorState] = useState<LoadingIndicator[]>([]);
-  const [input, setInput] = useState("");
+export function useApp() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
 
-  useEffect(() => {
-    setWordCount(
-      messages.reduce(
-        (acc, message) => acc + message.content.split(" ").length,
-        0
-      )
-    );
-  }, [messages]);
+  // You might have more states/refs here—like an abort controller, etc.
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const addUserMessage = (input: string) => {
-    const newUserMessage: DisplayMessage = {
-      role: "user",
-      content: input,
-      citations: [],
+  /**
+   * Primary method to handle user input from your chat <input>.
+   */
+  async function handleUserMessage(userInput: string) {
+    if (!userInput.trim()) return;
+
+    // 1) Add the user’s message to the chat
+    const newUserMessage: Message = {
+      role: 'user',
+      content: userInput,
     };
-    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
-    return newUserMessage;
-  };
+    setMessages((prev) => [...prev, newUserMessage]);
 
-  const addAssistantMessage = (content: string, citations: Citation[]) => {
-    const newAssistantMessage: DisplayMessage = {
-      role: "assistant",
-      content,
-      citations,
-    };
-    setMessages((prevMessages) => [...prevMessages, newAssistantMessage]);
-    return newAssistantMessage;
-  };
+    // 2) Check if this is a “market” command
+    if (userInput.toLowerCase().startsWith('market')) {
+      // e.g. userInput = "market TSLA" => symbol = "TSLA"
+      const parts = userInput.split(' ');
+      const symbol = parts[1] || 'SPY';
 
-  const fetchAssistantResponse = async (allMessages: DisplayMessage[]) => {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ chat: { messages: allMessages } }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to send message");
-    }
-
-    return response;
-  };
-
-  const handleStreamedMessage = (streamedMessage: StreamedMessage) => {
-    setIndicatorState([]);
-    setMessages((prevMessages) => {
-      const updatedMessages = [...prevMessages];
-      const lastMessage = updatedMessages[updatedMessages.length - 1];
-
-      if (lastMessage && lastMessage.role === "assistant") {
-        // Update the existing assistant message
-        updatedMessages[updatedMessages.length - 1] = {
-          ...lastMessage,
-          content: streamedMessage.message.content,
-          citations: streamedMessage.message.citations,
-        };
-      } else {
-        // Add a new assistant message
-        updatedMessages.push({
-          role: "assistant",
-          content: streamedMessage.message.content,
-          citations: streamedMessage.message.citations,
-        });
-      }
-
-      return updatedMessages;
-    });
-  };
-
-  const handleStreamedLoading = (streamedLoading: StreamedLoading) => {
-    setIndicatorState((prevIndicatorState) => [
-      ...prevIndicatorState,
-      streamedLoading.indicator,
-    ]);
-  };
-
-  const handleStreamedError = (streamedError: StreamedError) => {
-    setIndicatorState((prevIndicatorState) => [
-      ...prevIndicatorState,
-      streamedError.indicator,
-    ]);
-  };
-
-  const handleStreamedDone = (streamedDone: StreamedDone) => {};
-
-  const routeResponseToProperHandler = (payload: string) => {
-    const payloads = payload.split("\n").filter((p) => p.trim() !== "");
-
-    if (payloads.length === 0) {
-      return; // No non-empty payloads
-    }
-
-    for (const payload of payloads) {
-      const parsedPayload = JSON.parse(payload);
-
-      if (streamedMessageSchema.safeParse(parsedPayload).success) {
-        handleStreamedMessage(parsedPayload as StreamedMessage);
-      } else if (streamedLoadingSchema.safeParse(parsedPayload).success) {
-        handleStreamedLoading(parsedPayload as StreamedLoading);
-      } else if (streamedErrorSchema.safeParse(parsedPayload).success) {
-        handleStreamedError(parsedPayload as StreamedError);
-      } else if (streamedDoneSchema.safeParse(parsedPayload).success) {
-        handleStreamedDone(parsedPayload as StreamedDone);
-      } else {
-        throw new Error("Invalid payload type");
-      }
-    }
-  };
-
-  const processStreamedResponse = async (response: Response) => {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new Error("No reader available");
-    }
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const payload = new TextDecoder().decode(value);
-      routeResponseToProperHandler(payload);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIndicatorState([]);
-    setIsLoading(true);
-    setInput("");
-    const newUserMessage = addUserMessage(input);
-    if (wordCount > WORD_CUTOFF) {
-      addAssistantMessage(WORD_BREAK_MESSAGE, []);
-      setIsLoading(false);
-    } else {
-      setTimeout(() => {
-        // NOTE: This is a hacky way to show the indicator state only after the user message is added.
-        // TODO: Find a better way to do this.
-        setIndicatorState([
-          {
-            status: "Understanding your message",
-            icon: "understanding",
-          },
-        ]);
-      }, 600);
+      // 2a) Call the /api/market-data route (GET request, passing symbol as query param)
+      const marketUrl = `/api/market-data?symbol=${symbol}`;
 
       try {
-        const response = await fetchAssistantResponse([
-          ...messages,
-          newUserMessage,
-        ]);
-        await processStreamedResponse(response);
+        const res = await fetch(marketUrl);
+        const data = await res.json();
+
+        // If successful, data has shape { role: 'assistant', content: 'My trading recommendation...' }
+        if (data.role && data.content) {
+          setMessages((prev) => [...prev, data]); // Add to chat
+        } else if (data.error) {
+          // If there's an error field, show that
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: data.error },
+          ]);
+        }
       } catch (error) {
-        console.error("Error:", error);
-      } finally {
-        setIsLoading(false);
+        // In case /api/market-data fails entirely
+        setMessages((prev) => [
+          ...prev,
+          { role: 'assistant', content: 'Error fetching market data.' },
+        ]);
       }
+
+      // Done handling “market” command, so return
+      return;
     }
-  };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  };
+    // 3) Otherwise, call the normal /api/chat route (streaming GPT or similar)
+    await streamAiResponse(userInput);
+  }
 
-  useEffect(() => {
-    // Load messages from local storage when component mounts
-    const storedMessages = localStorage.getItem("chatMessages");
-    if (storedMessages) {
-      setMessages(JSON.parse(storedMessages));
+  /**
+   * Streams an assistant response from /api/chat and appends tokens as they arrive.
+   * Replace with whatever your existing code was if you had something similar.
+   */
+  async function streamAiResponse(userInput: string) {
+    setIsStreaming(true);
+
+    // Cancel any existing stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, [setMessages]);
+    abortControllerRef.current = new AbortController();
 
-  useEffect(() => {
-    // Save messages to local storage whenever they change
-    if (messages.length > 1) {
-      localStorage.setItem("chatMessages", JSON.stringify(messages));
-    } else {
-      localStorage.removeItem("chatMessages");
-    }
-  }, [messages]);
+    try {
+      const response = await fetchEventSource('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userInput }),
+        signal: abortControllerRef.current.signal,
+        onmessage: (event) => {
+          // The server might send a “DONE” event to close
+          if (event.data === '[DONE]') {
+            setIsStreaming(false);
+            abortControllerRef.current = null;
+            return;
+          }
 
-  const clearMessages = () => {
-    setMessages([]);
-    setWordCount(0);
-  };
+          // Otherwise, event.data is the next chunk of the assistant’s response
+          const token = event.data;
+          setMessages((prevMessages) => {
+            // Insert or update the last assistant message
+            const lastMessage = prevMessages[prevMessages.length - 1];
 
-  return {
-    messages,
-    handleInputChange,
-    handleSubmit,
-    indicatorState,
-    input,
-    isLoading,
-    setMessages,
-    clearMessages,
-  };
-}
+            // If the last message was from the assistant, append
+            if (lastMessage && lastMessage.role === 'assistant') {
+              const updatedMessage = {
+                ...lastMessage,
+                content: lastMessage.content + token,
+              };
+              return [...prevMessages.slice(0, -1), updatedMessage];
+            } else {
+              // Otherwise, create a new assistant message
+              const newAssistantMessage: Message = {
+                role: 'assistant',
+                content: token,
+              };
+              return [...prevMessages, newAssistantMessage];
+            }
+          });
+        },
+        onerror: (error) => {
+          console.error('EventSource error:', error);
+          setIsStreaming(false);
+          abortControllerRef.current = null;
+        },
+        onclose: () => {
+          // The server closed th
