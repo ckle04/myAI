@@ -48,9 +48,11 @@ export function analyzeMarketData(data: any) {
     if (!data || !data["Time Series (5min)"]) return { error: "Invalid data" };
 
     const timeSeries = data["Time Series (5min)"];
-    const timestamps = Object.keys(timeSeries);
-    const latestTime = timestamps[0];
+    const timestamps = Object.keys(timeSeries).sort().reverse(); // Ensure most recent is first
+    const latestTime = timestamps[0]; // Get latest time entry
     const latestData = timeSeries[latestTime];
+
+    if (!latestData) return { error: "No recent stock data available" };
 
     const open = parseFloat(latestData["1. open"]);
     const high = parseFloat(latestData["2. high"]);
@@ -72,4 +74,3 @@ export function analyzeMarketData(data: any) {
         recommendation
     };
 }
-
