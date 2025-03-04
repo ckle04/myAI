@@ -64,8 +64,15 @@ export async function POST(req: Request) {
     const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY"; // Default to S&P 500 (SPY)
 
     // 📌 Step 2: Fetch market data
-    const data = await getMarketData(symbol);
-    const analysis = analyzeMarketData(data);
+   const data = await getMarketData(symbol);
+
+if (data.error) {
+    return new Response(JSON.stringify({
+        reply: "⚠️ Sorry, I couldn't retrieve stock data at this time. Please try again later."
+    }), { status: 200 });
+}
+
+const analysis = analyzeMarketData(data);
 
     // 📌 Step 3: Return stock data response
     return new Response(JSON.stringify({
