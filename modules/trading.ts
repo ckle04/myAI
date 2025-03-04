@@ -1,23 +1,37 @@
 export async function getMarketData(symbol: string = 'SPY', interval: string = '5min') {
     try {
-        const response = await fetch(`/api/market-data?symbol=${symbol}&interval=${interval}`);
-        
+        console.log(`📡 Requesting stock data for ${symbol}...`);
+
+        const apiKey = process.env.ALPHA_VANTAGE_API_KEY;
+        if (!apiKey) {
+            throw new Error("Missing Alpha Vantage API Key");
+        }
+
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=${interval}&apikey=${apiKey}`;
+        console.log("🌐 Fetching from URL:", url);
+
+        const response = await fetch(url, { timeout: 10000 });
+
         if (!response.ok) {
-            throw new Error(`Stock API error: ${response.statusText}`);
+            console.error(`⚠️ API responded with status: ${response.status}`);
+            return { error: "Stock API request failed" };
         }
 
         const data = await response.json();
+        console.log("📊 API Response:", data);
 
         if (!data || data["Error Message"]) {
-            throw new Error("Invalid data received from Alpha Vantage API");
+            console.error("⚠️ Invalid data received:", data);
+            return { error: "Invalid stock data" };
         }
 
         return data;
     } catch (error) {
-        console.error("Market Data Fetch Error:", error);
-        return { error: "Failed to retrieve stock data" };
+        console.error("❌ Stock Data Fetch Error:", error);
+        return { error: "Failed to fetch stock data" };
     }
 }
+
 
 export function analyzeMarketData(data: any) {
     if (!data || !data["Time Series (5min)"]) return { error: "Invalid data" };
