@@ -1,172 +1,232 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { Message } from "../types/chat";
+import { useEffect, useState } from "react";
+import { INITIAL_MESSAGE } from "@/configuration/chat";
+import { WORD_CUTOFF, WORD_BREAK_MESSAGE } from "@/configuration/chat";
+import {
+  LoadingIndicator,
+  DisplayMessage,
+  StreamedDone,
+  streamedDoneSchema,
+  StreamedLoading,
+  streamedLoadingSchema,
+  StreamedMessage,
+  streamedMessageSchema,
+  Citation,
+  StreamedError,
+  streamedErrorSchema,
+} from "@/types";
 
-/**
- * Hook that manages chat messages, streaming responses, and market data requests.
- */
-export function useApp() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState(""); // Track input value
-  const [isStreaming, setIsStreaming] = useState(false);
+export default function useApp() {
+  const initialAssistantMessage: DisplayMessage = {
+    role: "assistant",
+    content: INITIAL_MESSAGE,
+    citations: [],
+  };
 
-  // Ref to store the current abort controller for streaming
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const [messages, setMessages] = useState<DisplayMessage[]>([
+    initialAssistantMessage,
+  ]);
+  const [wordCount, setWordCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [indicatorState, setIndicatorState] = useState<LoadingIndicator[]>([]);
+  const [input, setInput] = useState("");
 
-  /**
-   * Handles user message input
-   */
-  async function handleUserMessage(userInput: string) {
-    if (!userInput.trim()) return;
+  useEffect(() => {
+    setWordCount(
+      messages.reduce(
+        (acc, message) => acc + message.content.split(" ").length,
+        0
+      )
+    );
+  }, [messages]);
 
-    // 1. Add user's message to the chat state
-    const newUserMessage: Message = {
+  const addUserMessage = (input: string) => {
+    const newUserMessage: DisplayMessage = {
       role: "user",
-      content: userInput,
+      content: input,
+      citations: [],
     };
-    setMessages((prev) => [...prev, newUserMessage]);
+    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+    return newUserMessage;
+  };
 
-    // 2. Check if it starts with "market" (simple check)
-    if (userInput.toLowerCase().startsWith("market")) {
-      const parts = userInput.split(" ");
-      const symbol = parts[1] || "SPY"; // Default to SPY if no symbol is given
+  const addAssistantMessage = (content: string, citations: Citation[]) => {
+    const newAssistantMessage: DisplayMessage = {
+      role: "assistant",
+      content,
+      citations,
+    };
+    setMessages((prevMessages) => [...prevMessages, newAssistantMessage]);
+    return newAssistantMessage;
+  };
 
-      // Fetch market data
-      const marketUrl = `/api/market-data?symbol=${symbol}`;
+  const fetchAssistantResponse = async (allMessages: DisplayMessage[]) => {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ chat: { messages: allMessages } }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to send message");
+    }
+
+    return response;
+  };
+
+  const handleStreamedMessage = (streamedMessage: StreamedMessage) => {
+    setIndicatorState([]);
+    setMessages((prevMessages) => {
+      const updatedMessages = [...prevMessages];
+      const lastMessage = updatedMessages[updatedMessages.length - 1];
+
+      if (lastMessage && lastMessage.role === "assistant") {
+        // Update the existing assistant message
+        updatedMessages[updatedMessages.length - 1] = {
+          ...lastMessage,
+          content: streamedMessage.message.content,
+          citations: streamedMessage.message.citations,
+        };
+      } else {
+        // Add a new assistant message
+        updatedMessages.push({
+          role: "assistant",
+          content: streamedMessage.message.content,
+          citations: streamedMessage.message.citations,
+        });
+      }
+
+      return updatedMessages;
+    });
+  };
+
+  const handleStreamedLoading = (streamedLoading: StreamedLoading) => {
+    setIndicatorState((prevIndicatorState) => [
+      ...prevIndicatorState,
+      streamedLoading.indicator,
+    ]);
+  };
+
+  const handleStreamedError = (streamedError: StreamedError) => {
+    setIndicatorState((prevIndicatorState) => [
+      ...prevIndicatorState,
+      streamedError.indicator,
+    ]);
+  };
+
+  const handleStreamedDone = (streamedDone: StreamedDone) => {};
+
+  const routeResponseToProperHandler = (payload: string) => {
+    const payloads = payload.split("\n").filter((p) => p.trim() !== "");
+
+    if (payloads.length === 0) {
+      return; // No non-empty payloads
+    }
+
+    for (const payload of payloads) {
+      const parsedPayload = JSON.parse(payload);
+
+      if (streamedMessageSchema.safeParse(parsedPayload).success) {
+        handleStreamedMessage(parsedPayload as StreamedMessage);
+      } else if (streamedLoadingSchema.safeParse(parsedPayload).success) {
+        handleStreamedLoading(parsedPayload as StreamedLoading);
+      } else if (streamedErrorSchema.safeParse(parsedPayload).success) {
+        handleStreamedError(parsedPayload as StreamedError);
+      } else if (streamedDoneSchema.safeParse(parsedPayload).success) {
+        handleStreamedDone(parsedPayload as StreamedDone);
+      } else {
+        throw new Error("Invalid payload type");
+      }
+    }
+  };
+
+  const processStreamedResponse = async (response: Response) => {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No reader available");
+    }
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const payload = new TextDecoder().decode(value);
+      routeResponseToProperHandler(payload);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIndicatorState([]);
+    setIsLoading(true);
+    setInput("");
+    const newUserMessage = addUserMessage(input);
+    if (wordCount > WORD_CUTOFF) {
+      addAssistantMessage(WORD_BREAK_MESSAGE, []);
+      setIsLoading(false);
+    } else {
+      setTimeout(() => {
+        // NOTE: This is a hacky way to show the indicator state only after the user message is added.
+        // TODO: Find a better way to do this.
+        setIndicatorState([
+          {
+            status: "Understanding your message",
+            icon: "understanding",
+          },
+        ]);
+      }, 600);
 
       try {
-        const res = await fetch(marketUrl);
-        const data = await res.json();
-
-        // If successful, data should contain { role: 'assistant', content: '...' }
-        if (data.role && data.content) {
-          setMessages((prev) => [...prev, data]);
-        } else if (data.error) {
-          setMessages((prev) => [
-            ...prev,
-            { role: "assistant", content: data.error },
-          ]);
-        }
-      } catch (error) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "Error fetching market data." },
+        const response = await fetchAssistantResponse([
+          ...messages,
+          newUserMessage,
         ]);
+        await processStreamedResponse(response);
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setIsLoading(false);
       }
-
-      return; // Don't proceed with AI response streaming
     }
+  };
 
-    // 3. If not a "market" command, proceed with streaming AI response
-    await streamAiResponse(userInput);
-  }
-
-  /**
-   * Streams AI response from /api/chat using fetch-event-source
-   */
-  async function streamAiResponse(userInput: string) {
-    setIsStreaming(true);
-
-    // Cancel any existing stream
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    try {
-      await fetchEventSource("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userInput }),
-        signal: abortControllerRef.current.signal,
-        onmessage: (event) => {
-          if (event.data === "[DONE]") {
-            setIsStreaming(false);
-            abortControllerRef.current = null;
-            return;
-          }
-
-          // Append the streamed token to the assistant message
-          const token = event.data;
-          setMessages((prevMessages) => {
-            const lastMessage = prevMessages[prevMessages.length - 1];
-
-            if (lastMessage && lastMessage.role === "assistant") {
-              const updatedMessage = {
-                ...lastMessage,
-                content: lastMessage.content + token,
-              };
-              return [...prevMessages.slice(0, -1), updatedMessage];
-            } else {
-              return [
-                ...prevMessages,
-                { role: "assistant", content: token },
-              ];
-            }
-          });
-        },
-        onerror: (err) => {
-          console.error("EventSource error:", err);
-          setIsStreaming(false);
-          abortControllerRef.current = null;
-        },
-        onclose: () => {
-          setIsStreaming(false);
-          abortControllerRef.current = null;
-        },
-      });
-    } catch (error) {
-      console.error("Error in streamAiResponse:", error);
-      setIsStreaming(false);
-      abortControllerRef.current = null;
-    }
-  }
-
-  /**
-   * Clears all chat messages
-   */
-  function clearMessages() {
-    setMessages([]);
-  }
-
-  /**
-   * Handles input changes for the chat input field
-   */
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInput(e.target.value);
-  }
+  };
 
-  /**
-   * Handles chat message submission
-   */
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!input.trim()) return;
-
-    await handleUserMessage(input);
-    setInput(""); // Clear input field
-  }
-
-  /**
-   * Cleanup: Abort any ongoing streaming when component unmounts
-   */
   useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+    // Load messages from local storage when component mounts
+    const storedMessages = localStorage.getItem("chatMessages");
+    if (storedMessages) {
+      setMessages(JSON.parse(storedMessages));
+    }
+  }, [setMessages]);
+
+  useEffect(() => {
+    // Save messages to local storage whenever they change
+    if (messages.length > 1) {
+      localStorage.setItem("chatMessages", JSON.stringify(messages));
+    } else {
+      localStorage.removeItem("chatMessages");
+    }
+  }, [messages]);
+
+  const clearMessages = () => {
+    setMessages([]);
+    setWordCount(0);
+  };
 
   return {
     messages,
-    isStreaming,
-    handleUserMessage,
     handleInputChange,
     handleSubmit,
+    indicatorState,
     input,
-    clearMessages, // ✅ Ensures clearMessages exists
+    isLoading,
+    setMessages,
+    clearMessages,
   };
 }
