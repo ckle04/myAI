@@ -1,44 +1,35 @@
 "use client";
 
-import { useApp } from "@/hooks/use-app"; // ✅ Ensure named import
-import ChatHeader from "@/components/chat/header";
-import ChatMessages from "@/components/chat/messages";
 import ChatInput from "@/components/chat/input";
+import ChatMessages from "@/components/chat/messages";
+import useApp from "@/hooks/use-app";
+import ChatHeader from "@/components/chat/header";
 
-/**
- * The main chat page component.
- */
 export default function Chat() {
   const {
     messages,
-    handleUserMessage,
     handleInputChange,
     handleSubmit,
     input,
-    isStreaming,
-    clearMessages, // ✅ Now properly imported
+    isLoading,
+    indicatorState,
+    clearMessages,
   } = useApp();
 
   return (
     <>
-      {/* Chat Header with Clear Messages Button */}
-      <ChatHeader clearMessages={clearMessages} /> 
-
-      {/* Chat Container */}
+      <ChatHeader clearMessages={clearMessages} />
       <div className="flex justify-center items-center h-screen">
         <div className="flex flex-col max-w-screen-lg w-full h-full p-5">
-          {/* Chat Messages */}
-          <ChatMessages messages={messages} />
-
-          {/* Chat Input */}
-          <ChatInput
-            input={input}
-            handleInputChange={handleInputChange}
-            handleSubmit={handleSubmit}
-            isLoading={isStreaming}
-          />
+          <ChatMessages messages={messages} indicatorState={indicatorState} />
         </div>
       </div>
+      <ChatInput
+        handleInputChange={handleInputChange}
+        handleSubmit={handleSubmit}
+        input={input}
+        isLoading={isLoading}
+      />
     </>
   );
 }
