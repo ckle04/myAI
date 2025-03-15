@@ -74,3 +74,92 @@ export function analyzeMarketData(data: any) {
         recommendation
     };
 }
+
+function analyzeMarketDataForTimestamp(
+  data: any,
+  requestedDateTime?: Date
+) {
+  // For intraday data, look at "Time Series (5min)"
+  const timeSeries = data["Time Series (5min)"];
+  if (!timeSeries) {
+    return { 
+      error: "No intraday data found in the response", 
+      open: undefined, 
+      high: undefined, 
+      low: undefined, 
+      close: undefined, 
+      volume: undefined, 
+      recommendation: "N/A",
+      latestTime: undefined
+    };
+  }
+
+  // Turn the time-series keys into an array. The first element is the latest candle.
+  const allTimestamps = Object.keys(timeSeries); 
+  if (allTimestamps.length === 0) {
+    return { 
+      error: "No timestamps found", 
+      open: undefined, 
+      high: undefined, 
+      low: undefined, 
+      close: undefined, 
+      volume: undefined, 
+      recommendation: "N/A",
+      latestTime: undefined
+    };
+  }
+
+  // If the user didn't provide a date/time, pick the newest candle
+  if (!requestedDateTime) {
+    const newestTimestamp = allTimestamps[0];
+    return buildAnalysisResult(timeSeries, newestTimestamp);
+  }
+
+  // Otherwise, find the candle closest to requestedDateTime
+  // Sort timestamps by absolute difference from requestedDateTime
+  const sortedByCloseness = allTimestamps.sort((a, b) => {
+    const diffA = Math.abs(new Date(a).valueOf() - requestedDateTime.valueOf());
+    const diffB = Math.abs(new Date(b).valueOf() - requestedDateTime.valueOf());
+    return diffA - diffB;
+  });
+
+  const bestMatch = sortedByCloseness[0];
+  return buildAnalysisResult(timeSeries, bestMatch);
+}
+
+function buildAnalysisResult(timeSeries: any, timestamp: string) {
+  const bar = timeSeries[timestamp];
+  if (!bar) {
+    return {
+      error: `No data for timestamp ${timestamp}`,
+      open: undefined,
+      high: undefined,
+      low: undefined,
+      close: undefined,
+      volume: undefined,
+      recommendation: "N/A",
+      latestTime: undefined
+    };
+  }
+
+  const open = parseFloat(bar["1. open"]);
+  const high = parseFloat(bar["2. high"]);
+  const low = parseFloat(bar["3. low"]);
+  const close = parseFloat(bar["4. close"]);
+  const volume = parseFloat(bar["5. volume"]);
+
+  // Naïve logic for buy/sell
+  let recommendation = "HOLD";
+  if (close > open) recommendation = "BUY";
+  else if (close < open) recommendation = "SELL";
+
+  return {
+    latestTime: timestamp,
+    open,
+    high,
+    low,
+    close,
+    volume,
+    recommendation,
+  };
+}
