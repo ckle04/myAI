@@ -17,6 +17,8 @@ export async function GET(req: Request) {
     const response = await fetch(url);
     const data = await response.json();
 
+    console.log("Vantage API response", response);
+
     if (!data || data['Error Message']) {
       return NextResponse.json(
         { error: 'Failed to fetch market data' },
