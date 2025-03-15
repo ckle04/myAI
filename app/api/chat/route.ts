@@ -64,16 +64,20 @@ export async function POST(req: Request) {
 
         // Detect stock market queries
        let userDateTime: Date | undefined;
+      const dateTimeRegex = /(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})/;
+
+      const match = message.match(dateTimeRegex);
       
         if (
   message.toLowerCase().includes("market") ||
   message.toLowerCase().includes("stock")
 ) {
-          const dateTimeRegex = /(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/;
-  const match = message.match(dateTimeRegex);
-  if (match) {
-    userDateTime = new Date(match[1]);
-  }
+  const [_, mm, dd, yyyy, HH, MM] = match;
+  const isoString = `${yyyy}-${mm}-${dd}T${HH}:${MM}:00`;
+  userDateTime = new Date(isoString);
+  // if (match) {
+  //   userDateTime = new Date(match[1]);
+  // }
   const words = message.split(" ");
   const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY";
 
