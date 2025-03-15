@@ -103,7 +103,7 @@ export async function POST(req: Request) {
   }
 
   // 2. Analyze Market Data
-  const analysis = analyzeMarketData(data);
+  const analysis = analyzeMarketData(data, userDateTime);
   console.log("📈 Stock analysis:", analysis);
 
   // Build the final "reply" text
