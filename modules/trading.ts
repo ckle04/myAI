@@ -44,79 +44,46 @@ export async function getMarketData(symbol: string = 'SPY', interval: string = '
     }
 }
 
-export function analyzeMarketData(data: any) {
-    if (!data || !data["Time Series (5min)"]) return { error: "Invalid data" };
-
-    const timeSeries = data["Time Series (5min)"];
-    const timestamps = Object.keys(timeSeries).sort().reverse(); // Ensure most recent is first
-    const latestTime = timestamps[0]; // Get latest time entry
-    const latestData = timeSeries[latestTime];
-
-    if (!latestData) return { error: "No recent stock data available" };
-
-    const open = parseFloat(latestData["1. open"]);
-    const high = parseFloat(latestData["2. high"]);
-    const low = parseFloat(latestData["3. low"]);
-    const close = parseFloat(latestData["4. close"]);
-    const volume = parseInt(latestData["5. volume"]);
-
-    let recommendation = "HOLD";
-    if (close > open) recommendation = "BUY";
-    else if (close < open) recommendation = "SELL";
-
-    return {
-        latestTime,
-        open,
-        high,
-        low,
-        close,
-        volume,
-        recommendation
-    };
-}
-
-function analyzeMarketDataForTimestamp(
+export function analyzeMarketData(
   data: any,
   requestedDateTime?: Date
 ) {
-  // For intraday data, look at "Time Series (5min)"
   const timeSeries = data["Time Series (5min)"];
   if (!timeSeries) {
-    return { 
-      error: "No intraday data found in the response", 
-      open: undefined, 
-      high: undefined, 
-      low: undefined, 
-      close: undefined, 
-      volume: undefined, 
+    return {
+      error: "No intraday data found in the response",
+      latestTime: undefined,
+      open: undefined,
+      high: undefined,
+      low: undefined,
+      close: undefined,
+      volume: undefined,
       recommendation: "N/A",
-      latestTime: undefined
     };
   }
 
-  // Turn the time-series keys into an array. The first element is the latest candle.
+  // Get all timestamps (keys) in Time Series; first key is usually the newest
   const allTimestamps = Object.keys(timeSeries); 
   if (allTimestamps.length === 0) {
-    return { 
-      error: "No timestamps found", 
-      open: undefined, 
-      high: undefined, 
-      low: undefined, 
-      close: undefined, 
-      volume: undefined, 
+    return {
+      error: "No timestamps found",
+      latestTime: undefined,
+      open: undefined,
+      high: undefined,
+      low: undefined,
+      close: undefined,
+      volume: undefined,
       recommendation: "N/A",
-      latestTime: undefined
     };
   }
 
-  // If the user didn't provide a date/time, pick the newest candle
+  // If the user didn't provide a date, use the newest candle
   if (!requestedDateTime) {
     const newestTimestamp = allTimestamps[0];
     return buildAnalysisResult(timeSeries, newestTimestamp);
   }
 
-  // Otherwise, find the candle closest to requestedDateTime
-  // Sort timestamps by absolute difference from requestedDateTime
+  // Otherwise, find the candle whose timestamp is closest to requestedDateTime
   const sortedByCloseness = allTimestamps.sort((a, b) => {
     const diffA = Math.abs(new Date(a).valueOf() - requestedDateTime.valueOf());
     const diffB = Math.abs(new Date(b).valueOf() - requestedDateTime.valueOf());
@@ -132,13 +99,13 @@ function buildAnalysisResult(timeSeries: any, timestamp: string) {
   if (!bar) {
     return {
       error: `No data for timestamp ${timestamp}`,
+      latestTime: undefined,
       open: undefined,
       high: undefined,
       low: undefined,
       close: undefined,
       volume: undefined,
       recommendation: "N/A",
-      latestTime: undefined
     };
   }
 
@@ -148,7 +115,6 @@ function buildAnalysisResult(timeSeries: any, timestamp: string) {
   const close = parseFloat(bar["4. close"]);
   const volume = parseFloat(bar["5. volume"]);
 
-  // Naïve logic for buy/sell
   let recommendation = "HOLD";
   if (close > open) recommendation = "BUY";
   else if (close < open) recommendation = "SELL";
