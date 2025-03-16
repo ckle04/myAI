@@ -81,6 +81,9 @@ export async function POST(req: Request) {
 
   if (words.length > 1) {
     symbol = words.filter((word: string) => /^[A-Z]+$/.test(word));
+    if (symbol.length === 0) {
+      error = true;
+    }
   } else {
     error = true;
   }
