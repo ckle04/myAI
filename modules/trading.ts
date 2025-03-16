@@ -1,4 +1,4 @@
-export async function getMarketData(symbol: string = 'SPY', interval: string = '5min') {
+export async function getMarketData(symbol: string = 'SPY', interval: string = '15min') {
     try {
         console.log(`📡 Requesting stock data for ${symbol}...`);
 
@@ -48,7 +48,7 @@ export function analyzeMarketData(
   data: any,
   requestedDateTime?: Date
 ) {
-  const timeSeries = data["Time Series (5min)"];
+  const timeSeries = data["Time Series (15min)"];
   if (!timeSeries) {
     return {
       error: "No intraday data found in the response",
