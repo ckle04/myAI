@@ -7,7 +7,8 @@ export async function getMarketData(symbol: string = 'SPY', interval: string = '
             throw new Error("Missing Alpha Vantage API Key");
         }
 
-        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=${interval}&apikey=${apiKey}`;
+        // const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${symbol}&interval=${interval}&apikey=${apiKey}`;
+        const url = `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=IBM&interval=5min&month=2009-01&outputsize=full&apikey=${apiKey}`
         console.log("🌐 Fetching from URL:", url);
 
         // Set up timeout with AbortController
