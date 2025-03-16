@@ -62,8 +62,6 @@ export async function POST(req: Request) {
 
         console.log("📝 User message:", message);
 
-        // Detect stock market queries
-       let userDateTime: Date | undefined;
       
        // Force "market TICKER [optional time]" format
 if (message.trim().toLowerCase().startsWith("market ")) {
