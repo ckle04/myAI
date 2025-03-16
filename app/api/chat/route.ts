@@ -131,10 +131,6 @@ const intention: Intention = await determineIntention(chat);
 // ...
 
 
-        console.log("🤖 Processing non-stock related message");
-
-        const intention: Intention = await determineIntention(chat);
-
         if (intention.type === "question") {
             return ResponseModule.respondToQuestion(chat, providers, pineconeIndex);
         } else if (intention.type === "hostile_message") {
