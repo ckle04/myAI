@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   let error = false;
 
   if (words.length > 1) {
-    symbol = words.filter(word => /^[A-Z]+$/.test(word));
+    symbol = words.filter((word: string) => /^[A-Z]+$/.test(word));
   } else {
     error = true;
   }
