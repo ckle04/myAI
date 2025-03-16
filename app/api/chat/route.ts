@@ -91,9 +91,52 @@ export async function POST(req: Request) {
 
   console.log("📊 Fetching stock data for:", symbol);
 
+  // if there is an error, send an error message
+  if (error) {
+    const reply = "Sorry, the stock market you asked for is not capitalized. Please retry with your market in all caps."
+     return new Response(
+    new ReadableStream({
+      start(controller) {
+        const textEncoder = new TextEncoder();
+
+        // Optional: enqueue a "loading" indicator first
+        const loadingPayload = {
+          type: "loading",
+          indicator: { status: "Fetching market data...", icon: "thinking" },
+        };
+        controller.enqueue(textEncoder.encode(JSON.stringify(loadingPayload) + "\n"));
+
+        // Send the final message chunk
+        const streamedMessage = {
+          type: "message",
+          message: {
+            role: "assistant",
+            content: reply,
+            citations: [],
+          },
+        };
+        controller.enqueue(textEncoder.encode(JSON.stringify(streamedMessage) + "\n"));
+
+        // Send the "done" event so front-end knows we're finished
+        const donePayload = {
+          type: "done",
+          final_message: reply,
+        };
+        controller.enqueue(textEncoder.encode(JSON.stringify(donePayload) + "\n"));
+
+        // Close the stream
+        controller.close();
+      },
+    }),
+    {
+      headers: { "Content-Type": "text/event-stream" },
+    }
+  );
+  }
+
   // 1. Fetch Market Data
  const data = await getMarketData(symbol);
-  if (data.error || error) {
+  if (data.error) {
     console.log("⚠️ Stock data fetch failed:", data.error);
     // If there's an error, we can still do SSE but show a quick error message:
     return new Response(
