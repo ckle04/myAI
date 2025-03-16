@@ -76,8 +76,8 @@ export async function POST(req: Request) {
     userDateTime = new Date(match[1]);
   }
   const words = message.split(" ");
-  const symbol = "";
-  const error = false;
+  let symbol = "";
+  let error = false;
 
   if (words.length > 1) {
     symbol = words.filter(word => /^[A-Z]+$/.test(word));
