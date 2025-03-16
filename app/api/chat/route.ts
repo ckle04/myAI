@@ -62,74 +62,113 @@ export async function POST(req: Request) {
 
         console.log("📝 User message:", message);
 
+        // Detect stock market queries
+       let userDateTime: Date | undefined;
       
-       // Force "market TICKER [optional time]" format
-if (message.trim().toLowerCase().startsWith("market ")) {
-  const words = message.trim().split(/\s+/); 
-  // words[0] === "market"
-  // words[1] => ticker
-  if (words.length < 2) {
-    return new Response(
-      JSON.stringify({
-        reply: "Please provide a ticker after the 'market' keyword.",
-      }),
-      { status: 200 }
-    );
-  }
+        if (
+  message.toLowerCase().includes("market") ||
+  message.toLowerCase().includes("stock")
+) {
+ const dateTimeRegex = /(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2})/;
 
-  // 1) Get the ticker
-  const symbol = words[1].toUpperCase();
+      const match = message.match(dateTimeRegex);
+  if (match) {
+    userDateTime = new Date(match[1]);
+  }
+  const words = message.split(" ");
+  const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY";
+
   console.log("📊 Fetching stock data for:", symbol);
 
-  // 2) OPTIONAL: Parse the time from user message (e.g., "09:45")
-  //    If the user typed "market TSLA 09:45", then '09:45' might be words[2].
-  //    Or it might be anywhere in the string, so you can do a full regex on 'message'.
-  let userDateTime: Date | undefined = undefined;
-  const timeRegex = /(\d{2}:\d{2})/; // looks for HH:MM
-  const match = message.match(timeRegex);
-  if (match) {
-    // user typed something like "09:45"
-    // We'll create a Date for today's date at that time
-    const [hh, mm] = match[1].split(":");
-    const now = new Date(); // local system time
-    now.setHours(parseInt(hh, 10), parseInt(mm, 10), 0, 0);
-    userDateTime = now;
-    console.log("User requested time:", userDateTime.toString());
-  }
-
-  // 3) Fetch data as usual
+  // 1. Fetch Market Data
   const data = await getMarketData(symbol);
   if (data.error) {
     console.log("⚠️ Stock data fetch failed:", data.error);
+    // If there's an error, we can still do SSE but show a quick error message:
     return new Response(
-      JSON.stringify({
-        reply: "⚠️ Sorry, I couldn't retrieve stock data. Please try again later.",
+      new ReadableStream({
+        start(controller) {
+          const textEncoder = new TextEncoder();
+
+          // "loading" or "error" message
+          const errorPayload = {
+            type: "error",
+            indicator: {
+              status: "⚠️ Sorry, I couldn't retrieve stock data at this time.",
+              icon: "error",
+            },
+          };
+          controller.enqueue(textEncoder.encode(JSON.stringify(errorPayload) + "\n"));
+
+          // End the stream
+          controller.close();
+        },
       }),
-      { status: 200 }
+      {
+        headers: { "Content-Type": "text/event-stream" },
+      }
     );
   }
 
-  // 4) Analyze data for the optional userDateTime
+  // 2. Analyze Market Data
   const analysis = analyzeMarketData(data, userDateTime);
   console.log("📈 Stock analysis:", analysis);
 
-  // 5) Return SSE or JSON
+  // Build the final "reply" text
+  const reply = `📈 **Stock Update for ${symbol}**
+🕒 **Time:** ${analysis.latestTime}
+💰 **Open:** ${analysis.open}
+📊 **High:** ${analysis.high}
+📉 **Low:** ${analysis.low}
+🔒 **Close:** ${analysis.close}
+📦 **Volume:** ${analysis.volume}
+📢 **Recommendation:** ${analysis.recommendation}`;
+
+  // 3. Return SSE Stream
   return new Response(
-    JSON.stringify({
-      reply: `📈 **Stock Update for ${symbol}**\n🕒 **Time:** ${analysis.latestTime}\n💰 **Open:** ${analysis.open}\n📊 **High:** ${analysis.high}\n📉 **Low:** ${analysis.low}\n🔒 **Close:** ${analysis.close}\n📦 **Volume:** ${analysis.volume}\n📢 **Recommendation:** ${analysis.recommendation}`,
+    new ReadableStream({
+      start(controller) {
+        const textEncoder = new TextEncoder();
+
+        // Optional: enqueue a "loading" indicator first
+        const loadingPayload = {
+          type: "loading",
+          indicator: { status: "Fetching market data...", icon: "thinking" },
+        };
+        controller.enqueue(textEncoder.encode(JSON.stringify(loadingPayload) + "\n"));
+
+        // Send the final message chunk
+        const streamedMessage = {
+          type: "message",
+          message: {
+            role: "assistant",
+            content: reply,
+            citations: [],
+          },
+        };
+        controller.enqueue(textEncoder.encode(JSON.stringify(streamedMessage) + "\n"));
+
+        // Send the "done" event so front-end knows we're finished
+        const donePayload = {
+          type: "done",
+          final_message: reply,
+        };
+        controller.enqueue(textEncoder.encode(JSON.stringify(donePayload) + "\n"));
+
+        // Close the stream
+        controller.close();
+      },
     }),
     {
-      headers: { "Content-Type": "application/json" },
-      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
     }
   );
 }
 
-// Anything else => normal chat logic
-console.log("🤖 Processing non-stock related message");
-const intention: Intention = await determineIntention(chat);
-// ...
 
+        console.log("🤖 Processing non-stock related message");
+
+        const intention: Intention = await determineIntention(chat);
 
         if (intention.type === "question") {
             return ResponseModule.respondToQuestion(chat, providers, pineconeIndex);
