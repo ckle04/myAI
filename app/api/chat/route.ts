@@ -76,13 +76,21 @@ export async function POST(req: Request) {
     userDateTime = new Date(match[1]);
   }
   const words = message.split(" ");
-  const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY";
+  const symbol = "";
+  const error = false;
+
+  if (words.length > 1) {
+    symbol = words.filter(word => /^[A-Z]+$/.test(word));
+  } else {
+    error = true;
+  }
+   // const symbol = words.length > 1 ? words[1].toUpperCase() : "SPY";
 
   console.log("📊 Fetching stock data for:", symbol);
 
   // 1. Fetch Market Data
-  const data = await getMarketData(symbol);
-  if (data.error) {
+ const data = await getMarketData(symbol);
+  if (data.error || error) {
     console.log("⚠️ Stock data fetch failed:", data.error);
     // If there's an error, we can still do SSE but show a quick error message:
     return new Response(
