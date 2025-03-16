@@ -93,7 +93,7 @@ export async function POST(req: Request) {
 
   // if there is an error, send an error message
   if (error) {
-    const reply = "Sorry, the stock market you asked for is not capitalized. Please retry with your market in all caps."
+    const reply = "⚠️ Sorry, the stock ticker you asked for is not capitalized. Please retry with your stock in all caps."
      return new Response(
     new ReadableStream({
       start(controller) {
