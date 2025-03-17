@@ -6,7 +6,7 @@ const BASE_URL = 'https://www.alphavantage.co/query';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const symbol = searchParams.get('symbol') || 'SPY';
-  const interval = searchParams.get('interval') || '5min';
+  const interval = searchParams.get('interval') || '15min';
   const adjusted = searchParams.get('adjusted') || 'true';
   const extended_hours = searchParams.get('extended_hours') || 'true';
   const outputsize = searchParams.get('outputsize') || 'compact';
@@ -26,8 +26,8 @@ export async function GET(req: Request) {
       );
     }
 
-    // Extract the latest 5-minute bar from the data (if it exists)
-    const timeSeries = data['Time Series (5min)'];
+    // Extract the latest 15-minute bar from the data (if it exists)
+    const timeSeries = data['Time Series (15min)'];
     let recommendation = 'HOLD'; // Default
 
     if (timeSeries) {
