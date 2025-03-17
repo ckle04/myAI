@@ -177,10 +177,19 @@ const lastRefresh = (() => {
     return match ? match[1] : null; // Extract YYYY-MM-DD or return null if no match
 })();
 
+  // Build response to show time
+  const regexTime = /^\d{4}-\d{2}-\d{2} (\d{2}:\d{2}:\d{2})$/;
+
+const extractedTime = (() => {
+    if (!analysis.latestTime || typeof analysis.latestTime !== "string") return null; // Ensure it's a valid string
+    const match = analysis.latestTime.match(regexTime);
+    return match ? match[1] : null; // Extract HH:MM:SS or return null if no match
+})();
+
   // Build the final "reply" text
   const reply = `📈 **Stock Update for ${symbol}**
 📅 **Date Since Last Refresh:** ${lastRefresh}
-🕒 **Time:** ${analysis.latestTime}
+🕒 **Time:** ${extractedTime}
 💰 **Open:** ${analysis.open}
 📊 **High:** ${analysis.high}
 📉 **Low:** ${analysis.low}
