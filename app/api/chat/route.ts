@@ -168,8 +168,18 @@ export async function POST(req: Request) {
   const analysis = analyzeMarketData(data, userDateTime);
   console.log("📈 Stock analysis:", analysis);
 
+  // Build response to only show YYYY-MM-DD
+   const regex = /^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}$/;
+  const lastRefresh = analysis.latestTime
+        .map(date => {
+            const match = date.match(regex);
+            return match ? match[1] : null; // Extracts only the YYYY-MM-DD part
+        })
+        .filter(Boolean) as string[]; // Removes null values
+
   // Build the final "reply" text
   const reply = `📈 **Stock Update for ${symbol}**
+📅 **Date Since Last Refresh:** ${lastRefresh}
 🕒 **Time:** ${analysis.latestTime}
 💰 **Open:** ${analysis.open}
 📊 **High:** ${analysis.high}
