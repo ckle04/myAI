@@ -187,15 +187,15 @@ const extractedTime = (() => {
 })();
 
   // Build the final "reply" text
-  const reply = `📈 **Stock Update for ${symbol}**
-📅 **Date Since Last Refresh:** ${lastRefresh}
-🕒 **Time:** ${extractedTime}
-💰 **Open:** ${analysis.open}
-📊 **High:** ${analysis.high}
-📉 **Low:** ${analysis.low}
-🔒 **Close:** ${analysis.close}
-📦 **Volume:** ${analysis.volume}
-📢 **Recommendation:** ${analysis.recommendation}`;
+  const reply = `**📈 Stock Update for ${symbol}**
+ **📅 Date Since Last Refresh:** ${lastRefresh}
+ **🕒 Time:** ${extractedTime}
+ **💰 Open:** ${analysis.open}
+ **📊 High:** ${analysis.high}
+ **📉 Low:** ${analysis.low}
+ **🔒 Close:** ${analysis.close}
+ **📦 Volume:** ${analysis.volume}
+ **📢 Recommendation:** ${analysis.recommendation}`;
 
   // 3. Return SSE Stream
   return new Response(
