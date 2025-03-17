@@ -169,13 +169,13 @@ export async function POST(req: Request) {
   console.log("📈 Stock analysis:", analysis);
 
   // Build response to only show YYYY-MM-DD
-   const regex = /^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}$/;
-  const lastRefresh = analysis.latestTime
-        .map(date => {
-            const match = date.match(regex);
-            return match ? match[1] : null; // Extracts only the YYYY-MM-DD part
-        })
-        .filter(Boolean) as string[]; // Removes null values
+  const regex = /^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}$/;
+
+const lastRefresh = (() => {
+    if (!analysis.latestTime || typeof analysis.latestTime !== "string") return null; // Ensure it's a valid string
+    const match = analysis.latestTime.match(regex);
+    return match ? match[1] : null; // Extract YYYY-MM-DD or return null if no match
+})();
 
   // Build the final "reply" text
   const reply = `📈 **Stock Update for ${symbol}**
