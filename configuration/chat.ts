@@ -1,6 +1,6 @@
 import { OWNER_NAME, AI_NAME } from "./identity";
 
-export const INITIAL_MESSAGE: string = `Hello, I'm ${AI_NAME}, ${OWNER_NAME}'s AI assistant. Feel free to ask me about general financial tips! If you'd like up to date market information, just make sure to include 'market' or 'stock' in your query and capitalize your stock ticker. Keep in mind that this is ❗NOT FINANCIAL ADVICE❗ and is purely informational.`;
+export const INITIAL_MESSAGE: string = `Hello, I'm ${AI_NAME}, ${OWNER_NAME}'s AI assistant. Feel free to ask me about general financial tips! If you'd like up to date market information, just make sure to include 'market' or 'stock' in your query and capitalize your stock ticker. \n Keep in mind that this is ❗NOT FINANCIAL ADVICE❗ and is purely informational. This means that I also cannot provide technical analysis regarding general recommendations on stocks to buy but if you'd like an analysis regarding a specific stock I can help you with that.😎`;
 export const DEFAULT_RESPONSE_MESSAGE: string = `Sorry, I'm having trouble generating a response. Please try again later.`;
 export const WORD_CUTOFF: number = 8000; // Number of words until bot says it needs a break
 export const WORD_BREAK_MESSAGE: string = `Sorry i'm getting a little overloaded please try again.`;
